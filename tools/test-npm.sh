@@ -1,6 +1,25 @@
-#!/bin/bash
+#!/bin/bash -e
 
-set -e
+# handle arguments
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -p|--progress) PROGRESS="$2"; shift ;;
+    -p=*) PROGRESS="${1#-p=}" ;;
+    --progress=*) PROGRESS="${1#--progress=}" ;;
+    --logfile) LOGFILE="$2"; shift ;;
+    --logfile=*) LOGFILE="${1#--logfile=}" ;;
+    *) echo "Unknown parameters $@" && exit 1;;
+  esac
+  shift
+done
+
+# Set default progress indicator to classic
+PROGRESS=${PROGRESS:-classic}
+
+# Add log to npm command if set
+if [ -n "$LOGFILE" ]; then
+  LOG="| tee ../$LOGFILE"
+fi
 
 # always change the working directory to the project's root directory
 cd $(dirname $0)/..
@@ -36,8 +55,9 @@ unset NODE
 node cli.js rebuild
 # install npm devDependencies and run npm's tests
 node cli.js install --ignore-scripts
-# run the tests
-node cli.js run-script test-node
+# run the tests with logging if set
+echo node cli.js run-script test-node -- --reporter=$PROGRESS $LOG
+node cli.js run-script test-node -- --reporter=$PROGRESS $LOG
 
 # clean up everything one single shot
 cd .. && rm -rf test-npm
