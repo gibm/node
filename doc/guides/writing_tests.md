@@ -23,6 +23,8 @@ Tests can be added for multiple reasons:
 Let's analyze this very basic test from the Node.js test suite:
 
 ```javascript
+1  /* This test checks that the http module can handle non-ASCII characters in
+2  a request header. */
 1  'use strict'; 
 2  const common = require('../common');
 3  const http = require('http');
