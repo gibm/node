@@ -22,9 +22,13 @@ cd $(dirname $0)/..
 # pass a $NODE environment variable from something like Makefile
 # it should point to either ./node or ./node.exe, depending on the platform
 if [ -z $NODE ]; then
-  echo "No node executable provided. Bailing." >&2
-  exit 0
+  echo "No \$NODE executable provided, defaulting to out/Release/node." >&2
+  NODE=out/Release/node
 fi
+
+# ensure npm always uses the local node
+export PATH="$PWD/`dirname $NODE`:$PATH"
+unset NODE
 
 rm -rf test-npm
 
@@ -42,10 +46,6 @@ export npm_config_cache="$(pwd)/npm-cache"
 export npm_config_prefix="$(pwd)/npm-prefix"
 export npm_config_tmp="$(pwd)/npm-tmp"
 export npm_config_userconfig="$(pwd)/npm-userconfig"
-
-# ensure npm always uses the local node
-export PATH="$(../$NODE -p 'require("path").resolve("..")'):$PATH"
-unset NODE
 
 # make sure the binaries from the non-dev-deps are available
 node cli.js rebuild
