@@ -115,6 +115,7 @@ using v8::Locker;
 using v8::MaybeLocal;
 using v8::Message;
 using v8::Name;
+using v8::NamedPropertyHandlerConfiguration;
 using v8::Null;
 using v8::Number;
 using v8::Object;
@@ -122,6 +123,7 @@ using v8::ObjectTemplate;
 using v8::Promise;
 using v8::PromiseRejectMessage;
 using v8::PropertyCallbackInfo;
+using v8::PropertyHandlerFlags;
 using v8::ScriptOrigin;
 using v8::SealHandleScope;
 using v8::String;
@@ -169,11 +171,14 @@ static const char* icu_data_dir = nullptr;
 // used by C++ modules as well
 bool no_deprecation = false;
 
-#if HAVE_OPENSSL && NODE_FIPS_MODE
+#if HAVE_OPENSSL
+# if NODE_FIPS_MODE
 // used by crypto module
 bool enable_fips_crypto = false;
 bool force_fips_crypto = false;
-#endif
+# endif  // NODE_FIPS_MODE
+const char* openssl_config = nullptr;
+#endif  // HAVE_OPENSSL
 
 // true if process warnings should be suppressed
 bool no_process_warnings = false;
@@ -2716,7 +2721,7 @@ static void ProcessTitleSetter(Local<Name> property,
 }
 
 
-static void EnvGetter(Local<String> property,
+static void EnvGetter(Local<Name> property,
                       const PropertyCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
 #ifdef __POSIX__
@@ -2744,7 +2749,7 @@ static void EnvGetter(Local<String> property,
 }
 
 
-static void EnvSetter(Local<String> property,
+static void EnvSetter(Local<Name> property,
                       Local<Value> value,
                       const PropertyCallbackInfo<Value>& info) {
 #ifdef __POSIX__
@@ -2760,12 +2765,12 @@ static void EnvSetter(Local<String> property,
     SetEnvironmentVariableW(key_ptr, reinterpret_cast<WCHAR*>(*val));
   }
 #endif
-  // Whether it worked or not, always return rval.
+  // Whether it worked or not, always return value.
   info.GetReturnValue().Set(value);
 }
 
 
-static void EnvQuery(Local<String> property,
+static void EnvQuery(Local<Name> property,
                      const PropertyCallbackInfo<Integer>& info) {
   int32_t rc = -1;  // Not found unless proven otherwise.
 #ifdef __POSIX__
@@ -2791,7 +2796,7 @@ static void EnvQuery(Local<String> property,
 }
 
 
-static void EnvDeleter(Local<String> property,
+static void EnvDeleter(Local<Name> property,
                        const PropertyCallbackInfo<Boolean>& info) {
 #ifdef __POSIX__
   node::Utf8Value key(info.GetIsolate(), property);
@@ -3164,6 +3169,11 @@ void SetupProcessObject(Environment* env,
   READONLY_PROPERTY(process, "release", release);
   READONLY_PROPERTY(release, "name", OneByteString(env->isolate(), "node"));
 
+#if NODE_VERSION_IS_LTS
+  READONLY_PROPERTY(release, "lts",
+                    OneByteString(env->isolate(), NODE_VERSION_LTS_CODENAME));
+#endif
+
 // if this is a release build and no explicit base has been set
 // substitute the standard release download URL
 #ifndef NODE_RELEASE_URLBASE
@@ -3213,12 +3223,15 @@ void SetupProcessObject(Environment* env,
   // create process.env
   Local<ObjectTemplate> process_env_template =
       ObjectTemplate::New(env->isolate());
-  process_env_template->SetNamedPropertyHandler(EnvGetter,
-                                                EnvSetter,
-                                                EnvQuery,
-                                                EnvDeleter,
-                                                EnvEnumerator,
-                                                env->as_external());
+  process_env_template->SetHandler(NamedPropertyHandlerConfiguration(
+          EnvGetter,
+          EnvSetter,
+          EnvQuery,
+          EnvDeleter,
+          EnvEnumerator,
+          env->as_external(),
+          PropertyHandlerFlags::kOnlyInterceptStrings));
+
   Local<Object> process_env =
       process_env_template->NewInstance(env->context()).ToLocalChecked();
   process->Set(env->env_string(), process_env);
@@ -3637,6 +3650,8 @@ static void PrintHelp() {
          "  --enable-fips         enable FIPS crypto at startup\n"
          "  --force-fips          force FIPS crypto (cannot be disabled)\n"
 #endif  /* NODE_FIPS_MODE */
+         "  --openssl-config=path load OpenSSL configuration file from the\n"
+         "                        specified path\n"
 #endif /* HAVE_OPENSSL */
 #if defined(NODE_HAVE_I18N_SUPPORT)
          "  --icu-data-dir=dir    set ICU data load path to dir\n"
@@ -3797,6 +3812,8 @@ static void ParseArgs(int* argc,
     } else if (strcmp(arg, "--force-fips") == 0) {
       force_fips_crypto = true;
 #endif /* NODE_FIPS_MODE */
+    } else if (strncmp(arg, "--openssl-config=", 17) == 0) {
+      openssl_config = arg + 17;
 #endif /* HAVE_OPENSSL */
 #if defined(NODE_HAVE_I18N_SUPPORT)
     } else if (strncmp(arg, "--icu-data-dir=", 15) == 0) {
@@ -4493,6 +4510,9 @@ Environment* CreateEnvironment(Isolate* isolate,
   uv_check_init(env->event_loop(), env->idle_check_handle());
   uv_unref(reinterpret_cast<uv_handle_t*>(env->idle_prepare_handle()));
   uv_unref(reinterpret_cast<uv_handle_t*>(env->idle_check_handle()));
+
+  uv_idle_init(env->event_loop(), env->destroy_ids_idle_handle());
+  uv_unref(reinterpret_cast<uv_handle_t*>(env->destroy_ids_idle_handle()));
 
   // Register handle cleanups
   env->RegisterHandleCleanup(

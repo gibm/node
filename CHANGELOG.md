@@ -18,7 +18,7 @@ release.
 
 <table>
 <tr>
-  <th><a href="doc/changelogs/CHANGELOG_V6.md">v6</a><sup>Current</sup</th>
+  <th title="LTS Until 2019-04"><a href="doc/changelogs/CHANGELOG_V6.md">v6</a><sup>LTS</sup</th>
   <th><a href="doc/changelogs/CHANGELOG_V5.md">v5</a></th>
   <th title="LTS Until 2018-04"><a href="doc/changelogs/CHANGELOG_V4.md">v4</a><sup>LTS</sup></th>
   <th title="LTS Until 2016-12-31"><a href="doc/changelogs/CHANGELOG_V012.md">v0.12</a><sup>LTS</sup></th>
@@ -26,7 +26,11 @@ release.
 </tr>
 <tr>
   <td valign="top">
-<b><a href="doc/changelogs/CHANGELOG_V6.md#6.8.0">6.8.0</a></b><br/>
+<b><a href="doc/changelogs/CHANGELOG_V6.md#6.9.2">6.9.2</a></b><br/>
+<a href="doc/changelogs/CHANGELOG_V6.md#6.9.1">6.9.1</a><br/>
+<a href="doc/changelogs/CHANGELOG_V6.md#6.9.0">6.9.0</a><br/>
+<a href="doc/changelogs/CHANGELOG_V6.md#6.8.1">6.8.1</a><br/>
+<a href="doc/changelogs/CHANGELOG_V6.md#6.8.0">6.8.0</a><br/>
 <a href="doc/changelogs/CHANGELOG_V6.md#6.7.0">6.7.0</a><br/>
 <a href="doc/changelogs/CHANGELOG_V6.md#6.6.0">6.6.0</a><br/>
 <a href="doc/changelogs/CHANGELOG_V6.md#6.5.0">6.5.0</a><br/>

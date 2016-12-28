@@ -1095,7 +1095,7 @@ int SecureContext::TicketKeyCallback(SSL* ssl,
   static const int kTicketPartSize = 16;
 
   SecureContext* sc = static_cast<SecureContext*>(
-      SSL_CTX_get_app_data(ssl->ctx));
+      SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
 
   Environment* env = sc->env();
   HandleScope handle_scope(env->isolate());
@@ -1632,7 +1632,7 @@ void SSLWrap<Base>::GetPeerCertificate(
   // Last certificate should be self-signed
   while (X509_check_issued(cert, cert) != X509_V_OK) {
     X509* ca;
-    if (SSL_CTX_get_issuer(w->ssl_->ctx, cert, &ca) <= 0)
+    if (SSL_CTX_get_issuer(SSL_get_SSL_CTX(w->ssl_), cert, &ca) <= 0)
       break;
 
     Local<Object> ca_info = X509ToObject(env, ca);
@@ -2238,7 +2238,8 @@ void SSLWrap<Base>::SetALPNProtocols(
           env->alpn_buffer_private_symbol(),
           args[0]).FromJust());
     // Server should select ALPN protocol from list of advertised by client
-    SSL_CTX_set_alpn_select_cb(w->ssl_->ctx, SelectALPNCallback, nullptr);
+    SSL_CTX_set_alpn_select_cb(SSL_get_SSL_CTX(w->ssl_), SelectALPNCallback,
+                               nullptr);
   }
 #endif  // TLSEXT_TYPE_application_layer_protocol_negotiation
 }
@@ -3258,11 +3259,10 @@ void CipherBase::InitIv(const char* cipher_type,
     return env()->ThrowError("Unknown cipher");
   }
 
-  /* OpenSSL versions up to 0.9.8l failed to return the correct
-     iv_length (0) for ECB ciphers */
-  if (EVP_CIPHER_iv_length(cipher_) != iv_len &&
-      !(EVP_CIPHER_mode(cipher_) == EVP_CIPH_ECB_MODE && iv_len == 0) &&
-      !(EVP_CIPHER_mode(cipher_) == EVP_CIPH_GCM_MODE) && iv_len > 0) {
+  const int expected_iv_len = EVP_CIPHER_iv_length(cipher_);
+  const bool is_gcm_mode = (EVP_CIPH_GCM_MODE == EVP_CIPHER_mode(cipher_));
+
+  if (is_gcm_mode == false && iv_len != expected_iv_len) {
     return env()->ThrowError("Invalid IV length");
   }
 
@@ -3270,13 +3270,10 @@ void CipherBase::InitIv(const char* cipher_type,
   const bool encrypt = (kind_ == kCipher);
   EVP_CipherInit_ex(&ctx_, cipher_, nullptr, nullptr, nullptr, encrypt);
 
-  /* Set IV length. Only required if GCM cipher and IV is not default iv. */
-  if (EVP_CIPHER_mode(cipher_) == EVP_CIPH_GCM_MODE &&
-      iv_len != EVP_CIPHER_iv_length(cipher_)) {
-    if (!EVP_CIPHER_CTX_ctrl(&ctx_, EVP_CTRL_GCM_SET_IVLEN, iv_len, nullptr)) {
-      EVP_CIPHER_CTX_cleanup(&ctx_);
-      return env()->ThrowError("Invalid IV length");
-    }
+  if (is_gcm_mode &&
+      !EVP_CIPHER_CTX_ctrl(&ctx_, EVP_CTRL_GCM_SET_IVLEN, iv_len, nullptr)) {
+    EVP_CIPHER_CTX_cleanup(&ctx_);
+    return env()->ThrowError("Invalid IV length");
   }
 
   if (!EVP_CIPHER_CTX_set_key_length(&ctx_, key_len)) {
@@ -5789,10 +5786,31 @@ void TimingSafeEqual(const FunctionCallbackInfo<Value>& args) {
 }
 
 void InitCryptoOnce() {
-  OPENSSL_config(NULL);
+  SSL_load_error_strings();
+  OPENSSL_no_config();
+
+  // --openssl-config=...
+  if (openssl_config != nullptr) {
+    OPENSSL_load_builtin_modules();
+#ifndef OPENSSL_NO_ENGINE
+    ENGINE_load_builtin_engines();
+#endif
+    ERR_clear_error();
+    CONF_modules_load_file(
+        openssl_config,
+        nullptr,
+        CONF_MFLAGS_DEFAULT_SECTION);
+    int err = ERR_get_error();
+    if (0 != err) {
+      fprintf(stderr,
+              "openssl config failed: %s\n",
+              ERR_error_string(err, NULL));
+      CHECK_NE(err, 0);
+    }
+  }
+
   SSL_library_init();
   OpenSSL_add_all_algorithms();
-  SSL_load_error_strings();
 
   crypto_lock_init();
   CRYPTO_set_locking_callback(crypto_lock_cb);

@@ -124,7 +124,7 @@ $ node --zero-fill-buffers
 <Buffer 00 00 00 00 00>
 ```
 
-### What makes [`Buffer.allocUnsafe()`] and [`Buffer.allocUnsafeSlow()`] "unsafe"?
+### What makes `Buffer.allocUnsafe()` and `Buffer.allocUnsafeSlow()` "unsafe"?
 
 When calling [`Buffer.allocUnsafe()`] and [`Buffer.allocUnsafeSlow()`], the
 segment of allocated memory is *uninitialized* (it is not zeroed-out). While
@@ -1811,12 +1811,13 @@ added: v0.1.90
 -->
 
 * `encoding` {String} The character encoding to decode to. **Default:** `'utf8'`
-* `start` {Integer} Where to start decoding. **Default:** `0`
-* `end` {Integer} Where to stop decoding (not inclusive). **Default:** [`buf.length`]
+* `start` {Integer} The byte offset to start decoding at. **Default:** `0`
+* `end` {Integer} The byte offset to stop decoding at (not inclusive).
+  **Default:** [`buf.length`]
 * Return: {String}
 
-Decodes `buf` to a string according to the specified character encoding in `encoding`.
-`start` and `end` may be passed to decode only a subset of `buf`.
+Decodes `buf` to a string according to the specified character encoding in
+`encoding`. `start` and `end` may be passed to decode only a subset of `buf`.
 
 Examples:
 
@@ -1829,19 +1830,22 @@ for (var i = 0 ; i < 26 ; i++) {
 }
 
 // Prints: abcdefghijklmnopqrstuvwxyz
-console.log(buf.toString('ascii'));
+console.log(buf1.toString('ascii'));
 
 // Prints: abcde
-console.log(buf.toString('ascii', 0, 5));
+console.log(buf1.toString('ascii', 0, 5));
 
 
 const buf2 = Buffer.from('tést');
 
-// Prints: tés
-console.log(buf.toString('utf8', 0, 3));
+// Prints: 74c3a97374
+console.log(buf2.toString('hex'));
 
-// Prints: tés
-console.log(buf.toString(undefined, 0, 3));
+// Prints: té
+console.log(buf2.toString('utf8', 0, 3));
+
+// Prints: té
+console.log(buf2.toString(undefined, 0, 3));
 ```
 
 ### buf.toJSON()
@@ -2392,7 +2396,7 @@ console.log(buf);
 [`Buffer.from(array)`]: #buffer_class_method_buffer_from_array
 [`Buffer.from(arrayBuffer)`]: #buffer_class_method_buffer_from_arraybuffer_byteoffset_length
 [`Buffer.from(buffer)`]: #buffer_class_method_buffer_from_buffer
-[`Buffer.from(string)`]: #buffer_class_method_buffer_from_str_encoding
+[`Buffer.from(string)`]: #buffer_class_method_buffer_from_string_encoding
 [`Buffer.poolSize`]: #buffer_class_property_buffer_poolsize
 [`RangeError`]: errors.html#errors_class_rangeerror
 [`util.inspect()`]: util.html#util_util_inspect_object_options
