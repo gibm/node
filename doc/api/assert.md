@@ -219,13 +219,14 @@ assert.fail(1, 2, 'whoops', '>');
 // AssertionError: whoops
 ```
 
-## assert.ifError(value)
+## assert.ifError(value[, message])
 <!-- YAML
 added: v0.1.97
 -->
 
 Throws `value` if `value` is truthy. This is useful when testing the `error`
-argument in callbacks.
+argument in callbacks. If the message is truthy, the error message is the value
+of message.
 
 ```js
 const assert = require('assert');
@@ -238,6 +239,8 @@ assert.ifError('error');
 // Throws 'error'
 assert.ifError(new Error());
 // Throws Error
+assert.ifError('error', 'whoops');
+// Throws AssertionError: whoops
 ```
 
 ## assert.notDeepEqual(actual, expected[, message])
