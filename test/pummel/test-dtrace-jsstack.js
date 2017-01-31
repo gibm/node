@@ -59,7 +59,7 @@ const spawn = require('child_process').spawn;
  * when we call getloadavg() -- with the implicit assumption that our
  * deepest function is the only caller of os.loadavg().
  */
-const dtrace = spawn('dtrace', [ '-qwn', `syscall::getloadavg:entry/pid == ${
+const dtrace = spawn('dtrace', [ '-qwn', `syscall::getloadavg:entry/pid === ${
                                 process.pid}/{ustack(100, 8192); exit(0); }` ]);
 
 let output = '';

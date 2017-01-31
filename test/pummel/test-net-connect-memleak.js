@@ -35,7 +35,7 @@ net.createServer(function() {}).listen(common.PORT);
 
 let before = 0;
 {
-  // 2**26 == 64M entries
+  // 2**26 === 64M entries
   global.gc();
   let junk = [0];
   for (let i = 0; i < 26; ++i) junk = junk.concat(junk);

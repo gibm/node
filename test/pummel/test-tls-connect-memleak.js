@@ -45,7 +45,7 @@ tls.createServer({
 }).listen(common.PORT);
 
 {
-  // 2**26 == 64M entries
+  // 2**26 === 64M entries
   let junk = [0];
 
   for (let i = 0; i < 26; ++i) junk = junk.concat(junk);

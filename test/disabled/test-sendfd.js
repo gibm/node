@@ -67,7 +67,7 @@ var SOCK_PATH = path.join(__dirname,
                           path.basename(__filename, '.js') + '.sock');
 
 var logChild = function(d) {
-  if (typeof d == 'object') {
+  if (typeof d === 'object') {
     d = d.toString();
   }
 

@@ -225,7 +225,7 @@ for (let i = 0, l = rfc4231.length; i < l; i++) {
                      .update(rfc4231[i]['data'])
                      .digest('hex');
     if (rfc4231[i]['truncate']) {
-      result = result.substr(0, 32); // first 128 bits == 32 hex chars
+      result = result.substr(0, 32); // first 128 bits === 32 hex chars
     }
     assert.strictEqual(
       rfc4231[i]['hmac'][hash],
