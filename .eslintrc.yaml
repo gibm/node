@@ -45,6 +45,7 @@ rules:
   no-useless-escape: 2
   no-void: 2
   no-with: 2
+  eqeqeq: 2
 
   # Strict Mode
   # http://eslint.org/docs/rules/#strict-mode
