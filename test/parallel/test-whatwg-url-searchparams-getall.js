@@ -24,7 +24,7 @@ params = new URLSearchParams('a=1&a=2&a=3&a');
 assert.strictEqual(true, params.has('a'),
                    'Search params object has name "a"');
 matches = params.getAll('a');
-assert(matches && matches.length == 4,
+assert(matches && matches.length === 4,
        'Search params object has values for name "a"');
 assert.deepStrictEqual(matches, ['1', '2', '3', ''],
                        'Search params object has expected name "a" values');
@@ -32,7 +32,7 @@ params.set('a', 'one');
 assert.strictEqual(params.get('a'), 'one',
                    'Search params object has name "a" with value "one"');
 matches = params.getAll('a');
-assert(matches && matches.length == 1,
+assert(matches && matches.length === 1,
        'Search params object has values for name "a"');
 assert.deepStrictEqual(matches, ['one'],
                        'Search params object has expected name "a" values');

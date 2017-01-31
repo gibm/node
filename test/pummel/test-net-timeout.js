@@ -76,8 +76,8 @@ echo_server.listen(common.PORT, function() {
 });
 
 process.on('exit', function() {
-  assert.ok(starttime != null);
-  assert.ok(timeouttime != null);
+  assert.ok(starttime !== null);
+  assert.ok(timeouttime !== null);
 
   const diff = timeouttime - starttime;
   console.log('diff = ' + diff);

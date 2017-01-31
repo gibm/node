@@ -40,7 +40,7 @@ function test(extraArgs, stdoutPattern) {
       processes.forEach((myProcess) => { myProcess.kill(); });
     });
 
-    if (stdoutPattern != null) {
+    if (stdoutPattern !== null) {
       proc.stdout.on('data', (chunk) => {
         procStdout += chunk;
         outputMatched = outputMatched || stdoutPattern.test(procStdout);
