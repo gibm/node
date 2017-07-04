@@ -327,7 +327,7 @@ test-all: test-build test/gc/build/Release/binding.node
 test-all-valgrind: test-build
 	$(PYTHON) tools/test.py --mode=debug,release --valgrind
 
-CI_NATIVE_SUITES := addons addons-napi
+CI_NATIVE_SUITES := addons addons-napi gc
 CI_JS_SUITES := async-hooks doctool inspector known_issues message parallel pseudo-tty sequential
 
 # Build and test addons without building anything else
@@ -350,7 +350,7 @@ test-ci-js: | clear-stalled
 	fi
 
 test-ci: LOGLEVEL := info
-test-ci: | clear-stalled build-addons build-addons-napi
+test-ci: | clear-stalled build-addons build-addons-napi test/gc/build/Release/binding.node
 	out/Release/cctest --gtest_output=tap:cctest.tap
 	$(PYTHON) tools/test.py $(PARALLEL_ARGS) -p tap --logfile test.tap \
 		--mode=release --flaky-tests=$(FLAKY_TESTS) \
