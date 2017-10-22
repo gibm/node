@@ -68,6 +68,14 @@ exports.rootDir = exports.isWindows ? 'c:\\' : '/';
 
 exports.buildType = process.config.target_defaults.default_configuration;
 
+if (process.env.DEBUG) {
+  const { Console } = require('console');
+  const logger = new Console(process.stdout, process.stderr);
+  exports.log = logger.log;
+} else {
+  exports.log = () => {};
+}
+
 // If env var is set then enable async_hook hooks for all tests.
 if (process.env.NODE_TEST_WITH_ASYNC_HOOKS) {
   const destroydIdsList = {};

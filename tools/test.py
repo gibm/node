@@ -1350,6 +1350,8 @@ def BuildOptions():
   result = optparse.OptionParser()
   result.add_option("-m", "--mode", help="The test modes in which to run (comma-separated)",
       default='release')
+  result.add_option("-l", "--log", help="Enable logging using common.log",
+      default=False, action="store_true")
   result.add_option("-v", "--verbose", help="Verbose output",
       default=False, action="store_true")
   result.add_option('--logfile', dest='logfile',
@@ -1693,6 +1695,9 @@ def Main():
   if options.warn_unused:
     for rule in globally_unused_rules:
       print "Rule for '%s' was not used." % '/'.join([str(s) for s in rule.path])
+
+  if options.log:
+    os.environ['DEBUG'] = 'true'
 
   tempdir = os.environ.get('NODE_TEST_DIR') or options.temp_dir
   if tempdir:

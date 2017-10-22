@@ -2,6 +2,8 @@
 
 const common = require('../common');
 
+common.log('foo');
+
 common.expectsError(() => new Buffer(42, 'utf8'), {
   code: 'ERR_INVALID_ARG_TYPE',
   type: TypeError,

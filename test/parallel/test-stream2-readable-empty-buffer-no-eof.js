@@ -20,7 +20,7 @@
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 'use strict';
-require('../common');
+const common = require('../common');
 const assert = require('assert');
 
 const Readable = require('stream').Readable;
@@ -85,7 +85,7 @@ function test1() {
 
   process.on('exit', function() {
     assert.deepStrictEqual(results, [ 'xxxxx', 'xxxxx', 'EOF' ]);
-    console.log('ok');
+    common.log('ok');
   });
 }
 
@@ -113,6 +113,6 @@ function test2() {
 
   process.on('exit', function() {
     assert.deepStrictEqual(results, [ 'eHh4', 'eHg=', 'EOF' ]);
-    console.log('ok');
+    common.log('ok');
   });
 }

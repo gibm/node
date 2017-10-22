@@ -271,6 +271,11 @@ IP of `localhost`.
 
 Array of IPV6 representations for `localhost`.
 
+### log([data])
+* return [&lt;Function>]
+
+Configurable console logging.
+
 ### mustCall([fn][, exact])
 * `fn` [&lt;Function>] default = () => {}
 * `exact` [&lt;number>] default = 1
