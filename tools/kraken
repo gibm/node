@@ -1,0 +1,339 @@
+#!/usr/bin/env bash
+
+set -e${DEBUG:+x} # DEBUG=true for debugging output, unset DEBUG to disable.
+
+# TODO(gib): Allow rerunning script.
+
+################################################################################
+## Define variables
+
+# Reset colour:
+RED='\033[0;31m' # Red.
+BRED='\033[1;31m'       # Bright Red.
+MAGENTA='\033[0;35m'    # Magenta (purple).
+CYAN='\033[0;36m'       # Light blue.
+YELLOW='\033[0;33m'     # Yellow.
+NC='\033[0m'     # No Colour.
+
+# TODO(gib): Get these variables from config file.
+USER=gibfahn
+
+# Help text to print on error.
+sep="${MAGENTA}:${NC}" # Separator to use in help text.
+helpText="${CYAN}USAGE:${NC}
+  $0 [-p 17772] [-c Carbon] [-b v8.x] [-d 2017-11-20] [-m] [-u upstream] 8.9.1
+
+  8.9.0             $sep Node version to release (must come after arguments)
+  -c Carbon         $sep LTS codename (if LTS)
+  -d 2017-11-20     $sep Date to use (default: today)
+  -m                $sep This is a maintenance release
+  -r /path/to/node/ $sep Use if this script isn't in node/tools/
+  -b v8.x           $sep Branch name (default: v<Major>.x)
+  -u upstream       $sep Name of upstream remote (default: upstream)
+  -p 58972          $sep PR number (or full URL)
+  -h                $sep Show help.
+
+  DEBUG=true $0 for verbose logging (set -x)."
+
+################################################################################
+## Parse parameters
+
+args=("$@") # Keep a copy of the arguments.
+
+# TODO(gib): Add an argument for the previous version.
+unset VERSION
+while getopts ":b:c:d:p:u:hm" option; do
+  case "${option}" in
+     b) BRANCH="$OPTARG" ;;
+     c) CODENAME="'$OPTARG'" ;;
+     d) DATE="$OPTARG" ;;
+     h) echo -e "$helpText"; exit 0;;
+     m) MAINTENANCE=true ;;
+     r) REPO="$OPTARG" ;;
+     p) PR="$OPTARG" ;;
+     u) REMOTE="$OPTARG" ;;
+    \?) echo "Invalid option -$OPTARG."; exit 1 ;;
+     :) echo "Option -$OPTARG takes a parameter."; exit 1 ;;
+     *) echo "getopts gave me: ($OPTIND) $OPTARG"; exit 1 ;;
+  esac
+done
+shift $((OPTIND-1))
+
+error() { echo -e "${BRED}ERROR:${NC} $1 ${helpText:+\n\n}$helpText"; exit 1; }
+warn() { echo -e "${YELLOW}Warning:${NC} $1"; }
+
+# Version to release must be defined.
+[ -z "$1" ] && error "Node version required!"
+
+VERSION="${1#v}"; shift # 1st arg (excluding options) is node version.
+
+################################################################################
+## Calculate and verify args
+
+[ -z "$DATE" ] && export DATE=$(date -u +'%Y-%m-%d') # YYYY-MM-DD (UTC)
+export MAJOR=$(echo $VERSION | cut -d . -f 1)
+export MINOR=$(echo $VERSION | cut -d . -f 2)
+export PATCH=$(echo $VERSION | cut -d . -f 3)
+
+export IS_LTS=$([ "$CODENAME" ] && echo 1 || echo 0)
+[ -z "$BRANCH" ] && export BRANCH=v$MAJOR.x
+export RELEASE_TYPE=$(
+  { [ "$MAINTENANCE" ] && echo Maintenance; } ||
+  { [ "$CODENAME" ] && echo LTS; } ||
+  echo Current)
+export NEXT_RELEASE=$MAJOR.$MINOR.$((PATCH+1))
+[ -z "$REMOTE" ] && REMOTE=upstream # TODO(gib): Fix this.
+# If PR was just a number, prepend the nodejs URL.
+if [ "$PR" -a -z "$(echo $PR | tr -d '[:digit:]')" ]; then
+  PR=https://github.com/nodejs/node/pull/$PR
+fi
+# If PR set but not a Pull Request, error.
+if [ "$PR" ] && ! $(echo $PR | grep -q "https://github.com/nodejs/node/pull/[0-9]\+"); then
+  error "PR number  ($PR) didn't match the expected format."
+fi
+shortPR=$(echo $PR | sed 's|https://github.com/nodejs/node/pull/||' | sed 's|/$||')
+[ "$(echo shortPR | tr -d '[:digit:]')" ] && error "Something went wrong with the shortPR"
+
+# TODO(gib): Generate PREVIOUS from src/node_version.h
+[ -z "$PREVIOUS" ] && PREVIOUS="$(${PYTHON:-python} tools/getnodeversion.py)"
+
+# If it's not LTS then it can't be in maintenance.
+[ "$MAINTENANCE" -a -z "$CODENAME" ] && error "Non-LTS version can't be in maintenance!"
+
+# If the MAJOR isn't even then it can't be LTS.
+[ "$CODENAME" ] && (( $MAJOR % 2 )) && error "LTS versions have even major versions!"
+
+# Script won't support new Major release lines yet.
+[ "$MINOR" -eq 0 -a "$PATCH" -eq 0 ] && error "Script doesn't support major release lines!"
+
+
+unset helpText # Errors from this point aren't incorrect usage, so don't print help text.
+
+################################################################################
+## Verify the right prerequisites are installed
+
+# Install via your package manager.
+for i in git node npm; do
+  if ! type "$i" &>/dev/null; then error "You need to install $i"; fi
+done
+
+case `uname` in
+  Darwin) OPEN=open ;;
+  Linux) OPEN=xdg-open ;;
+  *) warn "Not sure what open command works on your machine" ;;
+esac
+
+# You have npm, so we can install these for you. Commented as we're not running
+# them for you yet.
+# for i in branch-diff changelog-maker; do
+#   if ! type "$i" &>/dev/null; then npm install --global "$i"; fi
+# done
+
+################################################################################
+## Generate a Todo list for the releaser.
+
+# TODO(gib): Better sed handling for mac (print brew install one-liner).
+
+rm -f "release-$VERSION.md"
+cat >"release-$VERSION.md" <<!!EOF
+# Release Notes for $VERSION
+
+Regenerate this script with:
+\`\`\`bash
+  $0 ${args[@]}
+\`\`\`
+
+Your settings:
+- Version: \`$VERSION\`
+- Previous version: \`$PREVIOUS\`
+- Remote branch: \`$REMOTE/$BRANCH\`
+- Release type: \`$RELEASE_TYPE\`
+- Release date: \`$DATE\`
+
+**Note:** If you haven't used this script before, check out the requirements by running:
+    $0 -h
+
+- [ ] Get on the right branch and update it
+  \`\`\`bash
+  git fetch $REMOTE; git checkout $BRANCH; git merge --fast-forward $REMOTE/$BRANCH
+  \`\`\`
+- [ ] Look at \`semver-minor\` commits:
+  \`\`\`bash
+  branch-diff $BRANCH-staging $REMOTE/v$((MAJOR+1)).x --exclude-label semver-major,semver-minor,dont-land-on-v8.x,backport-requested-$BRANCH, backported-to-$BRANCH --filter-release | tee audit-minors-$VERSION.md
+  \`\`\`
+- [ ] Cherry-pick \`semver-patch\` commits:
+  \`\`\`bash
+  branch-diff $BRANCH-staging $REMOTE/v$((MAJOR+1)).x --exclude-label semver-major,semver-minor,dont-land-on-v8.x,backport-requested-$BRANCH, backported-to-$BRANCH --filter-release | audit-$VERSION.md
+  \`\`\`
+- [ ] Check out the proposal branch
+  \`\`\`bash
+  git checkout -b v$VERSION-proposal $BRANCH-staging # TODO(gib): Confirm this.
+  \`\`\`
+- [ ] Create an initial release commit
+  \`\`\`bash
+  git commit -am "$DATE, Version $VERSION $CODENAME ($RELEASE_TYPE)"
+  \`\`\`
+- [ ] Raise a PR with your changes, copy the PR-URL or PR number, and rerun the
+  script. # TODO(gib): Make this conditional on PR being unset.
+  \`\`\`bash
+  $0 ${args[@]} -p <PR>
+  \`\`\`
+- [ ] Update src/node_version.h with the new version and set release bit.
+  \`\`\`bash
+  # TODO(gib): Make sure these work.
+  sed -i "s/NODE_MAJOR_VERSION [0-9]\+\$/NODE_MAJOR_VERSION ${MAJOR}/" src/node_version.h
+  sed -i "s/NODE_MINOR_VERSION [0-9]\+\$/NODE_MINOR_VERSION ${MINOR}/" src/node_version.h
+  sed -i "s/NODE_PATCH_VERSION [0-9]\+\$/NODE_PATCH_VERSION ${PATCH}/" src/node_version.h
+  sed -i "s/NODE_VERSION_IS_LTS [0-1]\$/NODE_VERSION_IS_LTS ${IS_LTS}/" src/node_version.h # TODO(gib): This is broken.
+  sed -i "s/NODE_VERSION_LTS_CODENAME \"\$/NODE_VERSION_LTS_CODENAME 1/" src/node_version.h
+  sed -i "s/NODE_VERSION_IS_RELEASE [0-1]\$/NODE_VERSION_IS_RELEASE 1/" src/node_version.h
+  \`\`\`
+- [ ] Generate the changelog for the release.
+  \`\`\`bash
+  changelog-maker --group --filter-release --start-ref v$PREVIOUS >release-$VERSION-changelog
+  cp release-$VERSION-changelog release-$VERSION-notable
+  \`\`\`
+- [ ] Add changelog to doc/changelogs/CHANGELOG_v$MAJOR.md:
+  \`\`\`bash
+  # TODO(gib): Finish this.
+  sed -i ""
+  \`\`\`
+- [ ] Manually edit the notable changes file
+  \`\`\`bash
+  \$VISUAL release-$VERSION-notable
+  \`\`\`
+- [ ] Add notable changes to doc/changelogs/CHANGELOG_v$MAJOR.md:
+  \`\`\`bash
+  # TODO(gib): Finish this.
+  sed -i ""
+  \`\`\`
+- [ ] Update REPLACEME tags:
+  \`\`\`bash
+  grep REPLACEME doc/api/*.md
+  sed -i "s/REPLACEME/$VERSION/g" doc/api/*.md
+  \`\`\`
+- [ ] Check for DEP00XX tags:
+  \`\`\`bash
+  grep DEP00XX doc/api/*.md
+  \`\`\`
+- [ ] Add changes to release commit
+  \`\`\`bash
+  git commit --amend -am "$DATE, Version $VERSION $CODENAME ($RELEASE_TYPE)
+
+  Notable changes:
+
+  \$(cat release-$VERSION-notable)
+
+  PR-URL: $PR"
+  git push -u $UPSTREAM v$VERSION-proposal
+  \`\`\`
+
+<a id="x.y.x"></a>
+## YYYY-MM-DD, Version x.y.z (Release Type), @releaser
+
+### Notable changes
+
+* List interesting changes here
+* Particularly changes that are responsible for minor or major version bumps
+* Also be sure to look at any changes introduced by dependencies such as npm
+* ... and include any notable items from there
+
+### Commits
+- [ ] Run [node-test-pull-request](https://ci.nodejs.org/job/node-test-pull-request/), [citgm-smoker](https://ci.nodejs.org/job/citgm-smoker/), and [iojs-release](https://ci-release.nodejs.org/job/iojs+release/) to create and test the rc.
+  - [ ] [node-test-pull-request](https://ci.nodejs.org/job/node-test-pull-request/) params:
+    \`\`\`bash
+    # Not usable yet.
+    https://www.ittybittytalks.com/how-to-automate-your-jenkins-build-script/
+    \`\`\`
+  - [ ] [citgm-smoker](https://ci.nodejs.org/job/citgm-smoker/)
+  - [ ] [iojs-release](https://ci-release.nodejs.org/job/iojs+release/)
+    \`\`\`bash
+    # Get the commit to build.
+    git rev-parse --short HEAD
+    \`\`\`
+- [ ] Generate the tag:
+  \`\`\`bash
+  git secure-tag v$VERSION \$(git rev-parse --short HEAD) -sm "$DATE Node.js v$VERSION $CODENAME ($RELEASE_TYPE) Release"
+  \`\`\`
+- [ ] Push to the upstream repo
+  \`\`\`bash
+  git push $REMOTE v$VERSION
+  \`\`\`
+- [ ] Update src/node_version.h with the new version and unset release bit.
+  \`\`\`bash
+  sed -i "s/NODE_PATCH_VERSION [0-9]\+\$/NODE_PATCH_VERSION $((PATCH+1))/" src/node_version.h
+  sed -i "s/NODE_VERSION_IS_RELEASE [0-1]\$/NODE_VERSION_IS_RELEASE 0/" src/node_version.h
+  \`\`\`
+- [ ] Create Working on... commit, and merge v$VERSION-proposal into $BRANCH
+  \`\`\`bash
+  git commit -am "Working on v$MAJOR.$MINOR.$((PATCH+1))
+
+  PR-URL: $PR"
+  git push $REMOTE v$VERSION-proposal
+  git branch -d v$MAJOR.x || true
+  git checkout -b v$MAJOR $REMOTE/v$MAJOR.x
+  git fetch --all
+  git merge --ff-only v$VERSION-proposal
+  git push $REMOTE $BRANCH
+  git checkout $BRANCH-staging
+  git rebase $BRANCH
+  git push --force-with-lease $DANGER v$MAJOR-staging
+  \`\`\`
+- [ ] Delete the v$VERSION-proposal branch in $PR
+- [ ] Merge v$VERSION-proposal into master, and rebase $BRANCH-staging on it.
+  \`\`\`bash
+  git fetch --all
+  git checkout master
+  git reset --hard $REMOTE/master
+  git cherry-pick v$VERSION
+  git reset src/node_version.h doc/api/*.md
+  git checkout src/node_version.h doc/api/*.md
+  git add -A
+  git cherry-pick --continue # If you have Changelog conflicts, fix them manually.
+  git push $REMOTE master
+  \`\`\`
+- [ ] Workaround the bug in tools/release.sh
+  \`\`\`diff
+  echo "Could not find signed tag for \"${version}\" or GPG key is not yours"
+  -exit 1
+  +# exit 1
+  \`\`\`
+- [ ] Promote and sign the release builds.
+  \`\`\`bash
+  tools/release.sh
+  \`\`\`
+- [ ] Check the release is at https://nodejs.org/dist/v$VERSION
+- [ ] Create a blog post:
+  \`\`\`bash
+  # cd /path/to/nodejs.org
+  git fetch --all
+  git checkout master
+  git reset --hard up/master # TODO(gib): Fix this for other remotes.
+  git checkout -b v$VERSION
+
+  npm i
+  node scripts/release-post.js $VERSION
+  \$VISUAL locale/en/blog/release/v$VERSION.md
+  npm run serve # Check that the post looks okay when rendered.
+  $OPEN localhost:8080/en/blog/release/v$VERSION
+  git add locale/en/blog/release/v$VERSION.md
+  git commit -m "Blog: v$VERSION release post
+
+  Refs: $PR"
+  git push -u fork v$VERSION
+  \`\`\`
+- [ ] Create and Squash and Merge the PR.
+- [ ] Tweet about it:
+  \`\`\`
+  🎉🎉🎉🎉🎉🎉 v$VERSION of @nodejs is out! 🎉🎉🎉🎉🎉🎉
+
+  Updates to V8 and libuv, and a host of others.
+
+  https://nodejs.org/en/blog/release/v$VERSION/
+
+  Get it with \`nvm i${CODENAME:+ --lts}\`
+  \`\`\`
+
+!!EOF
+
+cat "release-$VERSION.md"

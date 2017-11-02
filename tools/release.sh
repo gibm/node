@@ -41,6 +41,7 @@ shift $((OPTIND-1))
 
 echo "# Selecting GPG key ..."
 
+# TODO(gib): My key shows up as two keys (it has a sec and an ssb line).
 gpgkey=$(gpg --list-secret-keys --keyid-format SHORT | awk -F'( +|/)' '/^(sec|ssb)/{print $3}')
 keycount=$(echo $gpgkey | wc -w)
 
@@ -91,6 +92,10 @@ function sign {
   local version=$1
 
   if ! git tag -v $version 2>&1 | grep "${gpgkey}" | grep key > /dev/null; then
+    # TODO(gib): The key no longer shows up in the tag, not sure why.
+    # My key: 77984A986EBC2AA786BC0F66B01FBB92821C587A
+    # v8.9.0 tag: Git-EVTag-v0-SHA512: 03320c6f1f1431c9831753babe053d30b6b75dad8c01e76809537cb6dbe3a80fbfcd0a1661e6bef
+98defdd5ad38e5c9996b7ab9bedd980981d92aaeae973ccd
     echo "Could not find signed tag for \"${version}\" or GPG key is not yours"
     exit 1
   fi
